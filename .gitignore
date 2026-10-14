@@ -1,0 +1,22 @@
+﻿# Сборка и компиляция Java
+target/
+*.class
+*.jar
+*.war
+
+# Настройки IDE (IntelliJ IDEA, VS Code)
+.idea/
+*.iml
+.vscode/
+.project
+.settings/
+.classpath
+
+# Конфиденциальные данные и переменные окружения
+.env
+*.env.local
+
+# Системные файлы и логи
+*.log
+.DS_Store
+
