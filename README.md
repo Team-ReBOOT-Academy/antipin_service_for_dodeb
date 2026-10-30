@@ -9,7 +9,8 @@
 * **Имя сервиса (`serviceName`):** `antipin_service_for_dodeb`
 * **Версия сервиса:** `1.0.0`
 * **Выбранная стратегия:** `rsi-reversal` (RSI Reversal Strategy)
-* **Архитектурная документация:** [Проектный документ (docs/project-description.md)](docs/project-description.md)
+* **Архитектурная документация:** [Проектный документ с контекстной и компонентной схемами (docs/project-description.md)](docs/project-description.md)
+* **Управление задачами и план работ:** [План задач (docs/tasks-plan.md)](docs/tasks-plan.md) | [GitHub Projects Board](https://github.com/Team-ReBOOT-Academy/antipin_service_for_dodeb/projects)
 
 ---
 

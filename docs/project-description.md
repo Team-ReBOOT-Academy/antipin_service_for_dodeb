@@ -50,6 +50,48 @@
 | **Преподавательская платформа** | • Публикация закрытых свечей (исторических / realtime)• Проверка регистрационных данных и `secretKey`• Расчет группового консенсуса• Симуляция сделок и учет виртуального портфеля | • Внутренняя логика алгоритмов студентов• Код сервиса студента |
 | **Инфраструктура (Kafka, PostgreSQL)** | • Доставка сообщений и хранение таблиц состояния | • Бизнес-логика торговых сигналов |
 
+### Контекстная схема системы (System Context Diagram)
+
+Схема отображает границы системы, внешние сущности, пользователей и протоколы взаимодействия:
+
+```mermaid
+flowchart TD
+    subgraph Users ["Пользователи"]
+        Student["Студент-разработчик (Антипин А. А.)"]
+        Teacher["Преподаватель (Заказчик / Оператор)"]
+    end
+
+    subgraph ExternalSystems ["Внешние системы платформы"]
+        ExtProvider["Внешний поставщик котировок"]
+        Platform["Преподавательская платформа"]
+        Kafka["Apache Kafka (Брокер сообщений платформы)"]
+    end
+
+    subgraph StudentSystem ["Контур сервиса студента"]
+        Service["Сервис торговой стратегии (antipin_service_for_dodeb)"]
+        Postgres[("База данных PostgreSQL")]
+    end
+
+    ExtProvider -->|"1. Рыночные котировки"| Platform
+    Teacher -->|"2. Управление прогонами и заданиями"| Platform
+    
+    Platform -->|"3. market.candle.closed"| Kafka
+    Platform -->|"4. account.registration.result"| Kafka
+    Platform -->|"5. strategy.recommendation.result"| Kafka
+
+    Kafka -->|"6. Чтение свечей market.candle.closed"| Service
+    Kafka -->|"7. Чтение статуса регистрации"| Service
+    Kafka -->|"8. Чтение результатов сделок и портфеля"| Service
+
+    Service -->|"9. account.registration.request"| Kafka
+    Service -->|"10. account.service.heartbeat (каждые 5 сек)"| Kafka
+    Service -->|"11. strategy.recommendation.created"| Kafka
+
+    Service <-->|"12. Состояние прогонов, свечи, офсеты"| Postgres
+    Student -->|"13. Локальный запуск, переменные .env, GET /health"| Service
+    Student -->|"14. Анализ журналов и сборка Docker"| Service
+```
+
 
 
 ## 3. Взаимодействие с внешними системами
@@ -81,17 +123,91 @@
 
 ## 4. Состав решения на уровне компонентов
 
-Архитектура сервиса строится по принципу чистой слоистой архитектуры:
+Архитектура сервиса строится по принципу чистой модульной слоистой архитектуры.
 
-1. **HTTP Controller Layer (`HealthController`):** отвечает за мониторинг доступности (`GET /health`), не требует авторизации, отдает текущее состояние подсистем.
+### Крупноузловая компонентная схема (Component Diagram)
 
+```mermaid
+flowchart TD
+    subgraph ExternalKafka ["Apache Kafka (Брокер платформы)"]
+        TopicCandles["Топик свечей (CANDLE_TOPIC)"]
+        TopicRegReq["Топик account.registration.request"]
+        TopicRegRes["Топик account.registration.result"]
+        TopicHeartbeat["Топик account.service.heartbeat"]
+        TopicRecCreated["Топик strategy.recommendation.created"]
+        TopicRecResult["Топик strategy.recommendation.result"]
+    end
+
+    subgraph ServiceApp ["Сервис стратегии: antipin_service_for_dodeb"]
+        subgraph HttpLayer ["HTTP / Monitoring Layer"]
+            HealthCtrl["HealthController (GET /health)"]
+        end
+
+        subgraph MessagingLayer ["Kafka Messaging Layer (Spring Kafka)"]
+            KafkaConsumer["Kafka Consumer Service (Слушатель топиков)"]
+            KafkaProducer["Kafka Producer Service (Отправка сообщений)"]
+            KafkaConfig["Kafka Configuration (SASL_SSL SCRAM-SHA-512)"]
+        end
+
+        subgraph CoreLogic ["Бизнес-логика и стратегия"]
+            LifecycleMgr["Registration & Lifecycle Manager (Регистрация и Heartbeat)"]
+            DedupMgr["Deduplication & State Manager (Идемпотентность по sequenceNumber)"]
+            StrategyEngine["Strategy Engine (RSI 14 / Генератор BUY, SELL, HOLD)"]
+        end
+
+        subgraph StorageLayer ["Persistence Layer"]
+            StateRepo["State & History Repository"]
+        end
+
+        subgraph ConfigLayer ["Configuration Layer"]
+            EnvConfig["Application Config (.env / application.properties)"]
+        end
+    end
+
+    subgraph Database ["Внутреннее хранилище"]
+        PostgresDB[("PostgreSQL DB")]
+    end
+
+    %% Входящие потоки
+    TopicCandles -->|"market.candle.closed"| KafkaConsumer
+    TopicRegRes -->|"account.registration.result"| KafkaConsumer
+    TopicRecResult -->|"strategy.recommendation.result"| KafkaConsumer
+
+    %% Исходящие потоки
+    KafkaProducer -->|"account.registration.request"| TopicRegReq
+    KafkaProducer -->|"account.service.heartbeat"| TopicHeartbeat
+    KafkaProducer -->|"strategy.recommendation.created"| TopicRecCreated
+
+    %% Внутренние связи
+    EnvConfig -.->|"Параметры и секреты"| KafkaConfig
+    KafkaConfig -.-> MessagingLayer
+
+    KafkaConsumer -->|"Событие регистрации"| LifecycleMgr
+    LifecycleMgr -->|"Формирование запроса регистрации"| KafkaProducer
+    LifecycleMgr -->|"Периодический пульс (5 сек)"| KafkaProducer
+
+    KafkaConsumer -->|"Входящая свеча"| DedupMgr
+    DedupMgr -->|"Только новые валидные свечи"| StrategyEngine
+    DedupMgr <-->|"Проверка sequenceNumber и runId"| StateRepo
+
+    StrategyEngine -->|"Готовая рекомендация"| KafkaProducer
+    StrategyEngine <-->|"История цен для окна индикатора"| StateRepo
+
+    StateRepo <-->|"ACID транзакции"| PostgresDB
+
+    HealthCtrl -->|"Проверка состояния компонентов"| LifecycleMgr
+    HealthCtrl -->|"Проверка подключения к БД"| StateRepo
+```
+
+### Описание внутренних компонентов:
+
+1. **HTTP Controller Layer (`HealthController`):** отвечает за мониторинг доступности (`GET /health`), не требует авторизации, отдает текущее состояние подсистем (`UP`, `DEGRADED`).
 2. **Kafka Messaging Layer (Consumers / Producers):** обеспечивает надежный прием свечей и отправку рекомендаций и heartbeat через Spring Kafka. Настроен отдельный уникальный `group.id`.
-
-3. **State & Deduplication Manager:** отслеживает пару `(runId, instrument, sequenceNumber)` и `eventId` для исключения повторной обработки дубликатов сообщений (идемпотентность).
-
-4. **Strategy Engine:** изолированный вычислительный модуль, накапливающий свечи и рассчитывающий индикаторы для генерации сигналов.
-
-5. **Persistence Layer (Spring Data / PostgreSQL):** хранение истории прогонов, фиксация контрольных точек (offsets) и полученных результатов портфеля.
+3. **Registration & Lifecycle Manager:** управляет жизненным циклом сервиса — инициирует отправку запроса регистрации при старте приложения, отслеживает ответ платформы (`REGISTERED` / `REJECTED`) и запускает фоновый таймер отправки `heartbeat` раз в 5 секунд.
+4. **State & Deduplication Manager:** отслеживает пару `(runId, instrument, sequenceNumber)` и `eventId` для исключения повторной обработки дубликатов сообщений (гарантия идемпотентности).
+5. **Strategy Engine:** изолированный вычислительный модуль, накапливающий свечи и рассчитывающий индикаторы (RSI 14) для генерации сигналов `BUY`, `SELL`, `HOLD`. При недостаточном окне прогрева генерирует сигнал `HOLD`.
+6. **Persistence Layer (Spring Data / PostgreSQL):** хранение истории прогонов, фиксация контрольных точек (offsets) и полученных результатов портфеля.
+7. **Configuration Layer:** централизованная вычитка параметров окружения и безопасная передача учетных данных в брокер без утечки в логи.
 
 
 ## 5. Роли и ответственность участников
