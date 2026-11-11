@@ -1,0 +1,30 @@
+{
+  "eventId": "8b72c40f-1172-4fb4-9878-174c9bc72264",
+  "eventType": "market.candle.closed",
+  "schemaVersion": "1.0",
+  "occurredAt": "2026-09-24T08:15:01Z",
+  "correlationId": "run-42-SBER-000051",
+  "causationId": null,
+  "producer": "market-data-loader",
+  "payload": {
+    "runId": "run-42",
+    "groupId": "market",
+    "instrument": {
+      "ticker": "SBER",
+      "figi": "",
+      "currency": "RUB",
+      "lotSize": 10
+    },
+    "timeframe": "1m",
+    "sequenceNumber": 51,
+    "candleTime": "2026-09-24T08:15:00Z",
+    "open": "281.10",
+    "high": "281.80",
+    "low": "280.90",
+    "close": "281.40",
+    "volume": 150000,
+    "isWarmup": false,
+    "tradingDate": "2026-09-24",
+    "sessionPhase": "REGULAR"
+  }
+}

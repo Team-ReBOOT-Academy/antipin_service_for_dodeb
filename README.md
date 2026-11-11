@@ -6,10 +6,12 @@
 * **Репозиторий:** `antipin_service_for_dodeb`
 * **Идентификатор аккаунта (`accountId`):** `antipin-aa`
 * **Отображаемое имя (`accountName`):** `Антипин Александр`
+* **Учебная группа (`groupId`):** `МПБ-401`
 * **Имя сервиса (`serviceName`):** `antipin_service_for_dodeb`
 * **Версия сервиса:** `1.0.0`
 * **Выбранная стратегия:** `rsi-reversal` (RSI Reversal Strategy)
 * **Архитектурная документация:** [Проектный документ с контекстной и компонентной схемами (docs/project-description.md)](docs/project-description.md)
+* **Аналитика (Практика 3):** [Сценарии использования (docs/use-cases.md)](docs/use-cases.md) | [Требования, ограничения и риски (docs/requirements.md)](docs/requirements.md)
 * **Управление задачами и план работ:** [План задач (docs/tasks-plan.md)](docs/tasks-plan.md) | [GitHub Projects Board](https://github.com/Team-ReBOOT-Academy/antipin_service_for_dodeb/projects)
 
 ---
